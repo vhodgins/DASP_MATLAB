@@ -1,0 +1,191 @@
+%% Vincent Hodgins - EECE 525 - HW 1
+
+
+% Create Signal Vector
+[x,Fs]=audioread('HW_1_Signal.wav');
+N = length(x);
+n = (0:N-1)';
+L = 2^16; % define the desired length after zero-padding
+xpad = [x; zeros(L-N,1)];
+
+% Apply a rectangular window to the signal
+w = hamming(2^16); 
+%w = rectwin(2^16); % generate a rectangular window of length N
+x_win = xpad .* w; % apply the window to the signal
+
+% Compute FFT of Vector
+X = fft(x_win);
+X = X/N;
+X = fftshift(X);
+
+X_positive = X(ceil(end/2):end);
+f = Fs * (0:length(X_positive)-1) / length(X);
+
+% Plot Result
+%f = (0:L-1)'*Fs/L; % create frequency axis
+plot(f,(abs(X_positive))); % plot the magnitude of X
+xlabel('Frequency (Hz)');
+ylabel('Magnitude');
+title('FFT of HW1 Signal padded to 2^1^6 and normalized with Hamming window');
+
+
+%% 1.2 - STFT with different windows
+
+window=1028;
+overlap=256;
+[S,F,T] = spectrogram(x, hann(window), overlap, [], Fs);
+surf(T,F,mag2db(abs(S)),'edgecolor','none'); axis tight;view(0,90);
+title('STFT of HW1 Signal under Hamming window (wlen:1028; overlap:256)');
+ylabel('Frequency (Hz)');
+xlabel('Time (s)');
+%spectrogram(x, hanning(window), overlap, [], Fs, 'yaxis');
+
+
+
+%% 1.3 
+clear all
+alpha = .5;
+b=[alpha 1];
+a=[1 alpha];
+
+[phi, w] = phasedelay(b,a, 512);
+
+plot(w, phi);
+title("Phase delay of H(z) with \alpha:.5")
+xlim([0,pi]);
+ylabel("Phase Delay (samples)");
+xlabel("Frequency (rad)")
+
+
+
+%%
+alpha = .5;
+% Define range of x values
+x = linspace(0, pi, 1000);
+
+% Calculate y values
+y = -atan2( (alpha.*alpha.*sin(x)-sin(x)) , (cos(x)+alpha.*alpha.*cos(x)+2.*alpha)) ./ x;
+
+
+% Plot the function
+figure;
+plot(x, (y));
+title("Phase delay of H(z) with \alpha:.5")
+xlim([0,pi]);
+ylabel("Phase Delay (samples)");
+xlabel("Frequency (rad)")
+
+
+%% 
+
+clear all
+alpha = ;
+b=[alpha 1];
+a=[1 alpha];
+
+[gd, w] = grpdelay(b,a, 512);
+
+plot(w, gd);
+title("Group delay of H(z) with \alpha:.5")
+xlim([0,pi]);
+ylabel("Phase Delay (samples)");
+xlabel("Frequency (rad)")
+
+
+
+%% 
+a = 5;
+% Define range of x values
+x = linspace(0, pi, 1000);
+
+% Calculate y values
+b1 = (a.*a.*cos(x)-cos(x))./(a.*a.*cos(x) + cos(x) + 2.*a);
+b2 = (-1.*a*a.*sin(x)-sin(x)).*(a.*a.*sin(x)-sin(x)) ./ ((a.*a.*cos(x)+cos(x)+2.*a).^2);
+b3 = x.*( ((a.*a.*sin(x) - sin(x)).^2) ./ ((a.*a.*cos(x)+cos(x)+2.*a).^2) + 1);
+b4 = atan2(a.*a.*sin(x), a*a.*cos(x)+cos(x)+2.*a)./(x.^2);
+
+y = ((b1 - b2) ./ b3) - b4;
+% Plot the function
+figure;
+plot(x, (y));
+title("Group delay of H(z) with \alpha:.5")
+xlim([0,pi]);
+ylabel("Group Delay (samples)");
+xlabel("Frequency (rad)")
+
+
+
+
+
+%% 
+clear all
+x=[zeros(1,100) tukey(1000,0.8) zeros(1,100)].*exp(j*(pi*0.05)*(0:1199));
+al = -.8;
+b = [al 1];
+a = [1 al];
+
+y = filter(b,a,x);
+w = 1:1200;
+
+hold on
+plot(w,real(y))
+plot(w, real(x))
+title("Magnitude of real components of y[n] and x[n]")
+legend('x[n]', 'y[n]');
+xlabel("n")
+ylabel("|Re:f[n]|")
+
+
+
+
+%% 4.b
+f1 = 10;
+f2 = 23000;
+T = 2;
+Fs = 48000;
+[x, xinv] = sinusoid_sweep(f1,f2,T,Fs);
+
+window=1024;
+overlap=256;
+[S,F,T] = spectrogram(x, hann(window), overlap, [], Fs);
+surf(T,F,(abs(S)),'edgecolor','none'); axis tight;view(0,90);
+title('STFT of Linearly Swept Sinusoid (Magnitude)');
+ylabel('Frequency (Hz)');
+xlabel('Time (s)');
+set(gca,'YScale','log')
+
+
+
+%% 4.c
+
+% Read .wav
+wavsample = audioread("Big_Hall.wav");
+wavsample = wavsample(:,1);
+
+% Initialize Parameters
+f1 = 10;
+f2 = 23000;
+T = 2;
+Fs = 48000;
+
+% Generate Sinusoid
+[x, xinv] = sinusoid_sweep(f1,f2,T,Fs);
+
+% Apply Swept Sinusoid to Big_Hall.wav data
+convolved = conv(wavsample, x);
+
+% Apply time reversed sinusoid to leave behind Big_Hall impulse response
+final = conv(convolved, xinv);
+
+% Compute the STFT of the final impulse response
+[S,F,T] = spectrogram(final, hamming(window), overlap, [], Fs);
+
+% Plot Results
+surf(T,F,(abs(S)),'edgecolor','none'); axis tight;view(0,90);
+title('Impulse response of "Big\_Hall.wav" under linear swept sinusoid');
+ylabel('Frequency (Hz)');
+xlabel('Time (s)');
+set(gca,'YScale','log')
+
+
+

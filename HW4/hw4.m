@@ -1,0 +1,181 @@
+%% Testing Vibrato
+clear
+T = 1;
+Fs = 48000;
+t = 1:(Fs*T);
+
+x = (sin(2*400*pi.*t / Fs) +  sin(2*800*pi.*t / Fs) +  sin(2*1200*pi.*t / Fs))/3;
+
+W = 10;
+flfo = 5;
+
+test = linearvibrato(x, W, flfo, 48000);
+% sound(test, 48000);
+
+window=512;
+overlap=511;
+% Compute the STFT of the final impulse response
+[S,F,T] = spectrogram(test, hamming(window), overlap, [], Fs);
+
+% Plot Results
+surf(T,F,(abs(S)),'edgecolor','none');% axis tight;view(0,90);
+ti = sprintf('Spectrogram of Signal with Vibrato Applied W:%d, LFO:%dHz', W,flfo);
+title(ti);
+ylabel('Frequency (Hz)');
+xlabel('Time (s)');
+%set(gca,'YScale','log')
+
+
+
+
+
+%% Testing All Pass
+
+n = 0;
+fc = 500;
+fs = 2*10^5;
+T = 1/fs;
+wc = fc*2*pi;
+K = tan(wc*T/2);
+g = (K-1) / (K+1);
+
+
+
+b = [1 zeros(1,n) g];
+a = [g zeros(1,n) 1];
+
+sys = tf(b,a);
+sys2 = sys*sys*sys*sys; 
+
+a2 = cell2mat(sys2.num);
+b2 = cell2mat(sys2.den);
+
+freqz(b2,a2,44100, fs);
+ax = findall(gcf, 'Type', 'axes');
+set(ax, 'XScale', 'log');
+
+
+%% Flanger work
+clear 
+
+n=44;
+g=1;
+b = [1 zeros(1,n) g];
+a = 1;
+[h,w] = freqz(b,a,44100,44100);
+
+plot(w,20*log10(abs(h)))
+xlim([1,22100]);
+xlabel('Frequency')
+ylabel('Magnitude (dB)')
+title("Maxmimum Notch Spacing for Flanger (1000 Hz)");
+
+
+%% Nonlinearity
+clear 
+fs = 44100; 
+T = 2; 
+t = 1:(fs*T);
+ff = 500;
+
+x = sin(2*pi*ff*t/fs) .* exp(-t/fs);
+
+y = sign(x).*(1-exp(-abs(10*x)));
+
+ 
+% plot(t/fs,y);
+
+window=512;
+overlap=511;
+% Compute the STFT of the final impulse response
+[S,F,T] = spectrogram(y, hamming(window), overlap, [], fs);
+
+% Plot Results
+surf(T,F,(abs(S)),'edgecolor','none'); axis tight;view(0,90);
+ylabel('Frequency (Hz)');
+xlabel('Time (s)');
+title("Spectrogram of nonlinearity system applied to exponentially dampened sinusoid");
+
+%% Solution 4
+
+a=inv([1 -4800;1 -10000])*[-0.6931;-1.8971];
+alpha=a(2);
+A = exp(a(1));
+Ts = 1/44100;
+n=0:10000;
+x=A.*sin(2*pi*1000*n*Ts);
+y=sign(x).*(1 - exp(-abs(x)));
+[Sy,F,T]=spectrogram(y,hanning(256),128,1024,44100);
+surf(T/Ts,F/1000,20*log10(abs(Sy)))
+view(110,20)
+zlim([-50 50])
+xlabel('sample')
+ylabel('f (Hz)')
+zlabel('Spectrogram')
+
+%% Try 
+
+fs = 44100; 
+f = 2000;
+T = 1; 
+t = (1:(fs*T)) / fs;
+
+% constant-amplitude sinusoid
+x = sin(2*pi*f*t);
+
+% implement nonlinearity
+y = sign(x).*(1 - exp(-abs(x)));
+
+% Compute DFT
+X = fft(x);
+Y = fft(y);
+
+% Frequency vector
+f = (0:length(t)-1)*(fs/length(t));
+
+% Plot the DFT
+figure;
+hold on;
+plot(f(1:22050), 20*log10(abs(Y(1:22050))), 'r');
+plot(f(1:22050), 20*log10(abs(X(1:22050))), 'b');
+
+xlim([1,22050]);
+xlabel('Frequency (Hz)');
+ylabel('Magnitude (dB)');
+legend('Output','Input');
+title('DFT of nonlinearity with 2000Hz pure sine input');
+
+
+% % Plot the DFT
+% figure;
+% subplot(2,1,1);
+% plot(f, 20*log10(X), 'b');
+% xlabel('Frequency (Hz)');
+% ylabel('Amplitude (dB)');
+% title('Input Signal');
+% ylim([-50, 12]);
+% xlim([0, fs/2]);
+% 
+% subplot(2,1,2);
+% plot(f, 20*log10(Y), 'r');
+% xlabel('Frequency (Hz)');
+% ylabel('Amplitude (dB)');
+% title('Output Signal');
+% ylim([-50, 12]);
+% xlim([0, fs/2]);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,56 @@
+function y = overlap_save(x, h, N)
+    % USAGE: Applies the overlap_save method of convolution between input
+    %        signal x, and filter h(impulse response). Breaks each 
+    %        convolution into blocks of length N.
+    %
+    %        By Vincent Hodgins - EECE 525
+    %
+    % Inputs: 
+    %       x: input signal vector
+    %       h: impulse response vector
+    %       N: FFT length
+    %
+    % Output: 
+    %       y: Convoluted output vector
+
+    % Step 1: Obtain length of impulse response
+    Nh = length(h);
+
+    % Step 2: Choose output block size L: N = L + Nh - 1
+    L = N - Nh + 1;
+
+    % Step 3: Pad h[n] and compute FFT
+    hpad = [h, zeros(1, N - Nh)];
+    H = fft(hpad);
+
+    % Step 4: Prepend zeros to input block
+    xtilde = [zeros(1, Nh - 1), x];
+
+    % Calculate number of blocks
+    num_blocks = ceil(length(x) / L);
+
+    % Initialize output signal y
+    y = [];     
+
+    % Process each block
+    for i = 0:num_blocks - 1
+        % Extract the current block
+        xi = xtilde(i * L + 1 : i * L + N);
+
+        % Take FFT of the block
+        Xi = fft(xi);
+
+        % Multiply in the frequency domain
+        Yi = Xi .* H;
+
+        % Inverse FFT
+        yi = ifft(Yi);
+
+        % Save only after first Nh-1
+        yi = yi(Nh:N);
+
+        % Combine to get y
+        y = [y, yi];
+    end
+
+end

@@ -1,0 +1,54 @@
+function y = hw3q2(x, fc, Q, G, Fs)
+%hw3q2:  Applies a 2nd order peak filter specified by fc, G, and Q
+%        to input time vector x with sampling rate Fs. Then plots the
+%        resulting filter.
+
+g = 10^(G/20);
+Ho = g-1;
+T = 1/Fs;
+BW = fc/Q;
+omega = BW*2*pi;
+
+if g>=1
+    alp = (-1 + tan(.5*(omega*T))) / (1 + tan(.5*(omega*T)));
+elseif g<1
+    alp = (-g + tan(.5*(omega*T))) / (g + g*tan(.5*(omega*T)));
+end 
+
+d = -cos(2*pi*fc/Fs);
+b = [(1+.5*Ho*(1+alp)) d*(1-alp) -(.5*Ho*(1+alp) + alp)];
+a = [1 d*(1-alp) -alp];
+y = filter(b,a,x);
+
+[h, w] = freqz(b,a,44100);
+[psi, pl] = phasedelay(b,a,1024);
+[gamma, gl] = grpdelay(b,a,1024);
+
+subplot(2,2,1);
+title("Filter Specs")
+plot(w,20*log10(abs(h)))
+xlabel("Frequency (rad/sec)");
+ylavel("Magnitude (dB)");
+set(findall(gcf, 'Type', 'axes'), 'Xscale', 'log');
+set(findall(gcf, 'Type', 'axes'), 'Xlim', [.0001, pi]);
+
+subplot(2,2,2);
+plot(w,angle(h));
+xlabel("Frequency (rad/sec)");
+ylavel("Phase (rad)");
+set(findall(gcf, 'Type', 'axes'), 'Xscale', 'log');
+set(findall(gcf, 'Type', 'axes'), 'Xlim', [.0001, pi]);
+
+subplot(2,2,3);
+plot(pl,psi);
+xlabel("Frequency (rad/sec)");
+ylavel("Phase Delay (samples)");
+set(findall(gcf, 'Type', 'axes'), 'Xscale', 'log');
+
+subplot(2,2,4);
+plot(gl,gamma);
+xlabel("Frequency (rad/sec)");
+ylavel("Group Delay (samples)");
+set(findall(gcf, 'Type', 'axes'), 'Xscale', 'log');
+
+end

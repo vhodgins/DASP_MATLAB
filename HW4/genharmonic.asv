@@ -1,0 +1,17 @@
+function y = genharmonic(ff, Fs, T, dr, nharm, tdrop)
+%genharmonic Creates a harmonic of 3 sinusoids 
+%   Detailed explanation goes here
+
+N = Fs*T;
+y = zeros(1,N);
+
+for t=(1:N)
+    curlevel = 
+    amp = ;
+    for nh=1:nharm
+        amp = amp*(1-dr);
+        y(t) = y(t) + (amp*sin(2*pi*(ff*nh)*t/Fs));
+    end
+end
+
+end

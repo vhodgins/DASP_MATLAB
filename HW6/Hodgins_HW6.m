@@ -1,0 +1,175 @@
+%% EECE 525 - DASP
+% Vincent Hodgins 
+% Homework 6 - Reverb 
+
+%% Problem 1 -- Overlap Save 
+
+x = 1:15;               % input signal
+N = 8;                  % FFT length
+
+% Step 1 : Assume h[n], length Nh
+h = [2, 3, 3, 2];       % impulse vector
+Nh = length(h);
+
+% Step 2 : Choose output block size L :  N = L + Nh - 1
+L  = N - Nh + 1; 
+
+% Step 3 : Pad h[n] and compute FFT 
+hpad = [h, zeros(1, N - Nh)];
+H = fft(hpad);
+
+% Step 4: For each block- Done manually for two blocks:
+
+% Prepend zeros to input block
+xtilde = [zeros(1, Nh - 1), x];
+
+% split input into blocks:(Adding extra 1 to each index for vector indexing)
+x1 = xtilde(0+1:N-1 +1);             % First block i = 0
+x2 = xtilde(L+1 : L + N - 1 +1);   % Second block i = 1
+x3 = xtilde(2*L +1 : 2*L + N - 1 + 1);   % Third block i = 2
+
+% We do not do a fourth block as 3*L +1  = 16 - index out of range for x.  
+
+% take fft of each
+X1 = fft(x1); X2 = fft(x2); X3 = fft(x3);
+
+% multiply in freq domain
+Y1 = X1 .* H; Y2 = X2 .* H; Y3 = X3 .* H;
+
+% inverse fft 
+y1 = ifft(Y1); y2 = ifft(Y2); y3 = ifft(Y3);
+
+% Save only after first Nh-1 
+y1 = y1(Nh:N); y2 = y2(Nh:N); y3 = y3(Nh:N);
+
+% combine to get y
+y = cast([y1, y2, y3], 'uint8');
+
+% Compare with the convolution of x and h
+y_conv = conv(x, h);
+
+% Display the results
+disp('Overlap-Save result:');
+disp(y);
+
+disp('Convolution result:');
+disp(y_conv);
+
+%% Aside: overlap_save routine test: 
+
+y = [gardner_overlap_save(1:4,h) gardner_overlap_save(1:8,h) gardner_overlap_save(5:12,h) gardner_overlap_save(9:15,h)];
+disp('Overlap-Save result:');
+disp(cast(y, 'uint8'));
+disp('Convolution result:');
+disp(y_conv);
+
+
+%% Problem 2 -- Gardners Algorithm
+
+
+% Specs:
+%   N = 32
+%   h[n] = .9^n  { n in [0, ... , 10^5]
+%   x[n] = cos(0.1*pi*n)  { n in Naturals
+%   Compute Reverb Output for n in [128, ... , 191]
+
+% Setup 
+N = 32; 
+n_imp = 0:(10^5 -1);        % n for h[n] <-- Only need samples up to 192
+h = .9 .^ n_imp;           % define h[n]
+x = cos(.1*pi*n_imp);       % define x[n]<-- Only need samples up to 192
+
+% Partition h[n]       -- N=32 -> 128=4N, 192=6N
+h0 = h(1:2*N);         %  First 2N of h is h0
+h1 = h(2*N +1 : 3*N);  %  Third N - h1
+h2 = h(3*N +1 : 4*N);  %  Fourth N - h0 
+h3 = h(4*N +1 : 6*N);  %  Fifth & Sixth N - h3
+h4 = h(6*N +1 : 8*N);  %  Seventh & Eighth N - h4
+
+% Compute overlap-save convs:
+h3_02N = gardner_overlap_save(x(1:2*N), h3);    % Function prepends 0s
+h4_02N = gardner_overlap_save(x(1:2*N), h4);    % When length(x) <= N 
+
+h1_2NN = gardner_overlap_save(x(N+1: 3*N), h1);    % M values of x(2N+1:3N)
+h2_2NN = gardner_overlap_save(x(N+1: 3*N), h2);    % plus prev M values 
+h1_3NN = gardner_overlap_save(x(2*N +1: 4*N), h1); % x(N+1:2N) = x(N+1:3N)
+h2_3NN = gardner_overlap_save(x(2*N +1: 4*N), h2);
+
+h1_block = [h1_2NN h1_3NN]; % Concatinate h1 & h2 blocks to 2N samples
+h2_block = [h2_2NN h2_3NN];
+
+h0_xn = zeros(1,63);        % Loop to compute interupt h0 convs
+for i=128:191
+    X = fft(x(i- 2*N +1 : i), 2*N);
+    H0 = fft(h0, 2*N);
+    Y = X.*H0;
+    y = ifft(Y, 2*N);
+    h0_xn(i-127) = y(2*N);
+end 
+
+y = h1_block + h2_block + h3_02N + h4_02N + h0_xn;
+                            % Sum all components together
+t = 128:191;
+figure('Position', [600 200 812 420]); % consistent dimensions in jpgs
+hold on
+plot(t, y, 'LineWidth', 2, 'LineStyle','--');
+plot(t, x(t), 'LineWidth',2);
+plot(t, h0_xn);
+plot(t, h1_block);
+plot(t, h2_block);
+plot(t, h3_02N);
+plot(t, h4_02N);
+legend(["Output", "Input", "h0x", "h1x", "h2x", "h3x", "h4x"])
+title("Plot of Gardner Method Reverb for n \in [128,191]");
+xlabel("Sample");
+ylabel("Value");
+
+csvwrite('vector.csv', y);
+%% Problem 3 - Schroeder All Pass + Comb Reverb
+clear
+
+% Set parameters
+Fs = 44100; 
+T = 1/Fs; Tr = 1.3; 
+m = round((.001/T)*[31 37 41 47 5 1.7]);  % Coprime Ms ~ 30 - 45?
+g = [10.^( -3*m(1:4)*T / Tr) .7 .7 1];
+
+max_del_samples = ceil(max(m)); % m in samples
+
+% Set delay lines for each z term 
+delaylines = zeros(6, max_del_samples); 
+
+y = []; % Output vector
+% [x, Fs] = audioread("guitar1.wav"); % Audio signal in
+% x = [x' zeros(1,Tr*Fs)];     % Zero padding to hear echo after sound cuts
+x = [1 zeros(1, 1.3*Fs)];
+duration = length(x)/Fs;
+
+% Pass through 4 parallel comb filters:
+yC = [zeros(1, duration*Fs)];    % Comb filter stage output
+
+for t = 1:duration*Fs
+    % apply and sum each of the comb filters for the last x
+    for i = 1:4 % four comb filters in use
+        % Get sample, run through comb filter block, shift delay line
+        delayed_sample = delaylines(i, m(i));
+        yC(t) = yC(t) + (x(t) + g(i) * delayed_sample); 
+        delaylines(i,:) = [x(t) + g(i) * delayed_sample, delaylines(i,1:end-1)]; 
+    end
+    
+    yC(t) = .25*yC(t);  % normalize by 4 for 4 comb filters
+
+    % Just following the block diagram here, and shifting delayline
+    yA1 = -g(5)*yC(t) + delaylines(5,m(5));
+    delaylines(5,:) = [yC(t) + g(5)*yA1, delaylines(5, 1:max_del_samples-1)]; 
+    
+    yA2 = -g(6)*yA1 + delaylines(6,m(6));
+    delaylines(6,:) = [yA1 + g(6)*yA2, delaylines(6, 1:max_del_samples-1)]; 
+    
+    % Save the output of the all-pass filters
+    y(t) = yA2*g(7);
+end
+
+
+
+

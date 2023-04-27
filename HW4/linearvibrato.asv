@@ -1,0 +1,35 @@
+function y = linearvibrato(x, W, f_LFO, Fs)
+%UNTITLED3 Summary of this function goes here
+
+% Write an m-file function that takes in as input the signal vector x and vibrato parameters W (in 
+% msec) and f_LFO in (Hz) and operating sampling rate of Fs; the output of this function will be 
+% the signal x with the vibrato effect applied.
+
+AP = 0;
+% All pass mode - Adds feedback term
+FL = 0;
+% Flanger mode - Adds feed-forward term 
+
+% Convert width in msec to delays
+W = floor((W/1000)*Fs; 
+
+t = (1:length(x)) ./Fs;
+y = zeros(1,length(x));
+ds = W + W*sin(2*pi*f_LFO*t);
+y(1:2*W)=x(1:2*W);
+
+for t2=(2*W):length(x)
+    d = floor(ds(t2));
+    frac = mod(ds(t2),1);
+    if (t2-(d+1))<1
+        e = sprintf("%d , %d", t2, d+1);
+        error(e);
+    else
+        if AP==0
+            y(t2)= frac*x(t2-(d+1)) + (1-frac)*x(t2-d) + FL*x(t2);
+        else
+            y(t2)= x(t2-(d+1)) + (1-frac)*x(t2-d) - (1-frac)*y(t2-1) + FL*x(t2);
+        end 
+    end
+end
+end
